@@ -15,6 +15,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using BlazorCrudWithAuth.Areas.Identity;
 using BlazorCrudWithAuth.Data;
+using BlazorCrudWithAuth.Services;
+
+//https://www.blogofpi.com/crud-using-blazor-and-entity-framework-core/
 
 namespace BlazorCrudWithAuth
 {
@@ -40,11 +43,15 @@ namespace BlazorCrudWithAuth
             services.AddServerSideBlazor();
             services.AddScoped<AuthenticationStateProvider, RevalidatingIdentityAuthenticationStateProvider<IdentityUser>>();
             services.AddSingleton<WeatherForecastService>();
+
+            services.AddTransient<IToDoListService, ToDoListService>(); // to list services
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
-        public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
+        public void Configure(IApplicationBuilder app, IWebHostEnvironment env, IServiceProvider serviceProvider)
         {
+
+
             if (env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
@@ -71,6 +78,54 @@ namespace BlazorCrudWithAuth
                 endpoints.MapBlazorHub();
                 endpoints.MapFallbackToPage("/_Host");
             });
+        }
+
+
+        private async Task CreateUserAndRoles(IServiceProvider serviceProvider)
+        {
+            var RoleManager = serviceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+            var UserManager = serviceProvider.GetRequiredService<UserManager<IdentityUser>>();
+            string[] roleNames = { "Admin", "User" };
+            IdentityResult roleResult;
+
+            foreach (var roleName in roleNames)
+            {
+                var roleExist = await RoleManager.RoleExistsAsync(roleName);
+
+                if (!roleExist)
+                {
+                    //Create the roles and seed them to the database: Question 1
+                    roleResult = await RoleManager.CreateAsync(new IdentityRole(roleName));
+                }
+            }
+
+            IdentityUser user = await UserManager.FindByEmailAsync("admin@admin.com");
+
+            if (user == null)
+            {
+                user = new IdentityUser()
+                {
+                    UserName = "admin@admin.com",
+                    Email = "admin@admin.com"
+                };
+
+                await UserManager.CreateAsync(user, "AdminTest");
+            }
+            await UserManager.AddToRoleAsync(user, "Admin");
+
+            IdentityUser user1 = await UserManager.FindByEmailAsync("admin1@admin1.com");
+
+            if (user1 == null)
+            {
+                user1 = new IdentityUser()
+                {
+                    UserName = "admin1@admin1.com",
+                    Email = "admin1@admin1.com"
+                };
+                await UserManager.CreateAsync(user1, "AdminTest1");
+            }
+            await UserManager.AddToRoleAsync(user1, "Admin1");
+
         }
     }
 }
